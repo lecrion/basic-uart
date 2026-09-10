@@ -4,19 +4,19 @@
 
 本科生科创项目子任务.
 
-![task_detail_1]()
+![task_detail_1](https://raw.githubusercontent.com/lecrion/basic-uart/main/Images/task_detail_1.jpg)
 
-![task_detail_2]()
+![task_detail_2](https://raw.githubusercontent.com/lecrion/basic-uart/main/Images/task_detail_2.jpg)
 
 ### 参考工具
 
 1. UARTAssist 串口调试助手, 绿色软件, 来源 [野人家园](www.cmsoft.cn/software.html), 包含收发日志显示( 可选 ASCII/HEX ), 串口波特率, 数据位, 停止位, 校验位, 流控制等参数的配置, 接收保存到文件, 自动循环发送信号等功能. 属于较为底层的软件
 
-![uart_assist_show]()
+![uart_assist_show](https://raw.githubusercontent.com/lecrion/basic-uart/main/Images/uart_assist_show.jpg)
 
 1. Vofa+ 高自由度上位机, 这个软件支持的通信协议不仅限于串口, 还能够通过 UDP/TCP 接收数据. 它有一个很值得借鉴的功能就是插件驱动, 通过插件可以实现在屏幕上绘制曲线, 图表等一系列可视化组件. 同时也支持 raw 数据的显示, 以及串口全部参数的配置.
 
-![vofa_show]()
+![vofa_show](https://raw.githubusercontent.com/lecrion/basic-uart/main/Images/vofa_show.jpg)
 
 ### 技术设想
 
