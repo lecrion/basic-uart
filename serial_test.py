@@ -71,7 +71,7 @@ def main():
     parser = argparse.ArgumentParser(description="List and test serial ports.")
     parser.add_argument(
         "--port",
-        help="Port to open, for example COM3. If omitted, only list ports.",
+        help="Port to open, for example COM3."
     )
     parser.add_argument(
         "--baudrate",
