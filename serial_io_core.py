@@ -17,10 +17,10 @@ def list_serial_ports():
 
     ports_list = list(serial.tools.list_ports.comports())
     if not ports_list:
-        print("No serial ports found.")
+        print("未找到可用的 COM 端口.")
         return []
 
-    print("Available serial ports:")
+    print("可用的 COM 端口:")
     for port in ports_list:
         print(f"\nDevice: {port.device}")
         print(f"  Name: {port.name}")
@@ -134,7 +134,7 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                 self._display_pipe.flush()
                 return
 
-    class SerialIO: # 单个串口 IO 实现
+    class SerialIO: # 单个串口 IO 
         _serial_object = None # serial.Serial
         _recv_thread = None # SerialRecvThread
 
