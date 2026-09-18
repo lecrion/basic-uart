@@ -13,6 +13,10 @@ import datetime
 def debug(x):
     print(f"[Debug] {x}")
 
+def add_timestamp(data):
+    timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S.%f]") + f" Recv {len(data)} bytes\n"
+    return timestamp.encode("utf-8") + data
+
 def list_serial_ports():
 
     ports_list = list(serial.tools.list_ports.comports())
@@ -104,17 +108,14 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                 func(data)
 
         def run(self):
-            try:
-                while True:
+            while True:
+                try:
                     if self._serial_object.is_open:
-                        try:
-                            data = self._serial_object.read()
-                        except Exception as e:
-                            print(e)
-                            return
+                        data = self._serial_object.read()
                         if data:
                             data += self._serial_object.read_all()
 
+                            data = add_timestamp(data)
                             self._trigger_test_1(data)
                             if self._new_console_output:
                                 self._display_pipe.write(data)
@@ -128,11 +129,10 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                     else:
                         print("串口已关闭")
                         return
-            except Exception as e:
-                print(e)
-                self._display_pipe.write(f"{e}".encode())
-                self._display_pipe.flush()
-                return
+                except Exception as e:
+                    print(f"Exception in SerialRecvThread: {e}")
+                    self.release_resources()
+                    return
 
     class SerialIO: # 单个串口 IO 
         _serial_object = None # serial.Serial
@@ -140,16 +140,16 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
 
         def __init__(self, serial_args):
             self._serial_object = serial.Serial()
-            self._serial_object.port = serial_args["port"]
-            self._serial_object.baudrate = serial_args["baudrate"]
-            self._serial_object.bytesize = serial_args["bytesize"]
-            self._serial_object.parity = serial_args["parity"]
-            self._serial_object.stopbits = serial_args["stopbits"]
-            self._serial_object.timeout = serial_args["timeout"]
-            self._serial_object.xonxoff = serial_args["xonxoff"]
-            self._serial_object.rtscts = serial_args["rtscts"]
-            self._serial_object.write_timeout = serial_args["write_timeout"]
-            self._serial_object.dsrdtr = serial_args["dsrdtr"]
+            self._serial_object.port = serial_args.get("port", None)
+            self._serial_object.baudrate = serial_args.get("baudrate", 9600)
+            self._serial_object.bytesize = serial_args.get("bytesize", 8)
+            self._serial_object.parity = serial_args.get("parity", 'N')
+            self._serial_object.stopbits = serial_args.get("stopbits", 1)
+            self._serial_object.timeout = serial_args.get("timeout", None)
+            self._serial_object.xonxoff = serial_args.get("xonxoff", False)
+            self._serial_object.rtscts = serial_args.get("rtscts", False)
+            self._serial_object.write_timeout = serial_args.get("write_timeout", None)
+            self._serial_object.dsrdtr = serial_args.get("dsrdtr", False)
         
         def open(
             self,
@@ -168,7 +168,9 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             self._recv_thread.start()
         
         def close(self):
-            self._recv_thread.release_resources()
+            if self._recv_thread:
+                self._recv_thread.release_resources()
+                self._recv_thread = None
             self._serial_object.close()
         
         def send(self, data: bytes):
@@ -233,7 +235,7 @@ def main():
         
         @test_io_object.register_recv_trigger("test_1")
         def on_recv_test(data: bytes):
-            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Recv {len(data)} bytes\n{data.decode('utf-8')}")
+            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}] Recv {len(data)} bytes\n{data.decode('utf-8')}")
         
         while True:
             test_io_object.send(b"Hello from SerialIOCore!\n")
