@@ -17,7 +17,7 @@ def add_timestamp(data):
     timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S.%f]") + f" Recv {len(data)} bytes\n"
     return timestamp.encode("utf-8") + data
 
-def list_serial_ports():
+def list_serial_ports_print():
 
     ports_list = list(serial.tools.list_ports.comports())
     if not ports_list:
@@ -37,6 +37,13 @@ def list_serial_ports():
         print(f"  Manufacturer: {port.manufacturer}")
         print(f"  Product: {port.product}")
         print(f"  Interface: {port.interface}")
+
+def list_serial_ports():
+    ports_list = list(serial.tools.list_ports.comports())
+    result = []
+    for port in ports_list:
+        result.append(port.name)
+    return result
 
 class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线程
 
