@@ -15,7 +15,7 @@ def debug(x):
 
 def add_timestamp(data):
     timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S.%f]") + f" Recv {len(data)} bytes\n"
-    return timestamp.encode("utf-8") + data
+    return timestamp.encode("utf-8") + data + b"\n"
 
 def list_serial_ports_print():
 
@@ -40,9 +40,9 @@ def list_serial_ports_print():
 
 def list_serial_ports():
     ports_list = list(serial.tools.list_ports.comports())
-    result = []
+    result = {}
     for port in ports_list:
-        result.append(port.name)
+        result[port.name] = port.description
     return result
 
 class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线程
@@ -150,13 +150,16 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             self._serial_object.port = serial_args.get("port", None)
             self._serial_object.baudrate = serial_args.get("baudrate", 9600)
             self._serial_object.bytesize = serial_args.get("bytesize", 8)
-            self._serial_object.parity = serial_args.get("parity", 'N')
+            self._serial_object.parity = serial_args.get("parity", "N")
             self._serial_object.stopbits = serial_args.get("stopbits", 1)
             self._serial_object.timeout = serial_args.get("timeout", None)
             self._serial_object.xonxoff = serial_args.get("xonxoff", False)
             self._serial_object.rtscts = serial_args.get("rtscts", False)
             self._serial_object.write_timeout = serial_args.get("write_timeout", None)
             self._serial_object.dsrdtr = serial_args.get("dsrdtr", False)
+        
+        def get_port_name(self):
+            return self._serial_object.port
         
         def open(
             self,
@@ -204,7 +207,7 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
     
     def remove_serial_io(self, port):
         if self._serial_dict.get(port) is not None:
-            self._serial_dict[port].release_resources()
+            self._serial_dict[port].close()
             del self._serial_dict[port]
 
 
