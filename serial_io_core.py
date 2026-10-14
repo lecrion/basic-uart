@@ -7,15 +7,16 @@ import threading
 import serial.tools.list_ports
 import time
 import datetime
+import serial_logger
 
-# 参考: pyserial API Reference: https://pyserial.readthedocs.io/en/latest/pyserial_api.html
-
-def debug(x):
-    print(f"[Debug] {x}")
+# pyserial API Reference: https://pyserial.readthedocs.io/en/latest/pyserial_api.html
 
 def add_timestamp(data):
     timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S.%f]") + f" Recv {len(data)} bytes\n"
     return timestamp.encode("utf-8") + data + b"\n"
+
+def to_hex(data):
+    return data.hex(" ").upper().encode("utf-8")
 
 def list_serial_ports_print():
 
@@ -60,7 +61,21 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
         _file_output = True # 串口接收的数据输出到文件
         _normal_output = False # 串口接收的数据输出到主进程控制台
 
+        _hex_output = False # hex 输出
+
         _log_file = None # 日志文件
+
+        def set_properties(
+            self,
+            new_console_output = True,
+            file_output = True,
+            normal_output = False,
+            hex_output = False
+        ):
+            self._new_console_output = new_console_output
+            self._file_output = file_output
+            self._normal_output = normal_output
+            self._hex_output = hex_output
 
         def allocate_resources(self):
             self._recv_display_subprocess = subprocess.Popen(
@@ -91,18 +106,22 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             serial_object: serial.Serial, 
             new_console_output = True, 
             file_output = True, 
-            normal_output = False
+            normal_output = False,
+            hex_output = False
         ):
             super().__init__()
-
             self._serial_object = serial_object
-            self._new_console_output = new_console_output
-            self._file_output = file_output
-            self._normal_output = normal_output
+            self.set_properties(
+                new_console_output = new_console_output,
+                file_output = file_output,
+                normal_output = normal_output,
+                hex_output = hex_output
+            )
 
         _trigger_list = {
             "test_1": [], 
-            "test_2": []
+            "test_2": [],
+            "once_data_recv": []
         } # 事件触发列表
 
 
@@ -114,6 +133,10 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             for func in self._trigger_list["test_2"]:
                 func(data)
 
+        def _trigger_once_data_recv(self, data):
+            for func in self._trigger_list["once_data_recv"]:
+                func(data)
+
         def run(self):
             while True:
                 try:
@@ -122,8 +145,11 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                         if data:
                             data += self._serial_object.read_all()
 
+                            if self._hex_output:
+                                data = to_hex(data)
                             data = add_timestamp(data)
-                            self._trigger_test_1(data)
+                            
+                            self._trigger_once_data_recv(data)
                             if self._new_console_output:
                                 self._display_pipe.write(data)
                                 self._display_pipe.flush()
@@ -133,55 +159,87 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                             if self._normal_output:
                                 sys.stdout.buffer.write(data)
                                 sys.stdout.buffer.flush()
+                        else:
+                            serial_logger.Logger.d("SerialRecvThread", "No data received")
                     else:
-                        print("串口已关闭")
+                        serial_logger.Logger.d("SerialRecvThread", "串口已关闭")
                         return
                 except Exception as e:
-                    print(f"Exception in SerialRecvThread: {e}")
+                    serial_logger.Logger.e("SerialRecvThread", e)
                     self.release_resources()
                     return
 
     class SerialIO: # 单个串口 IO 
-        _serial_object = None # serial.Serial
+        _serial_properties = {}
+        _serial_object = serial.Serial()
         _recv_thread = None # SerialRecvThread
+        _is_open = False
 
         def __init__(self, serial_args):
-            self._serial_object = serial.Serial()
-            self._serial_object.port = serial_args.get("port", None)
-            self._serial_object.baudrate = serial_args.get("baudrate", 9600)
-            self._serial_object.bytesize = serial_args.get("bytesize", 8)
-            self._serial_object.parity = serial_args.get("parity", "N")
-            self._serial_object.stopbits = serial_args.get("stopbits", 1)
-            self._serial_object.timeout = serial_args.get("timeout", None)
-            self._serial_object.xonxoff = serial_args.get("xonxoff", False)
-            self._serial_object.rtscts = serial_args.get("rtscts", False)
-            self._serial_object.write_timeout = serial_args.get("write_timeout", None)
-            self._serial_object.dsrdtr = serial_args.get("dsrdtr", False)
+            self.set_default_properties()
+            self.set_properties(serial_args)
         
-        def get_port_name(self):
-            return self._serial_object.port
+        def set_properties(self, serial_args):
+            for key in serial_args:
+                self._serial_properties[key] = serial_args[key]
+                match key:
+                    case "port": self._serial_object.port = serial_args[key]
+                    case "baudrate": self._serial_object.baudrate = serial_args[key]
+                    case "bytesize": self._serial_object.bytesize = serial_args[key]
+                    case "parity": self._serial_object.parity = serial_args[key]
+                    case "stopbits": self._serial_object.stopbits = serial_args[key]
+                    case "timeout": self._serial_object.timeout = serial_args[key]
+                    case "xonxoff": self._serial_object.xonxoff = serial_args[key]
+                    case "rtscts": self._serial_object.rtscts = serial_args[key]
+                    case "write_timeout": self._serial_object.write_timeout = serial_args[key]
+                    case "dsrdtr": self._serial_object.dsrdtr = serial_args[key]
+        
+        def set_default_properties(self):
+            self.set_properties({
+                "baudrate": 9600,
+                "bytesize": 8,
+                "parity": "N",
+                "stopbits": 1,
+                "timeout": None,
+                "xonxoff": False,
+                "rtscts": False,
+                "write_timeout": None,
+                "dsrdtr": False
+            })
+        
         
         def open(
             self,
             new_console_output = True,
             file_output = True,
-            normal_output = False
+            normal_output = False,
+            hex_output = False
         ):
+            if self._is_open:
+                return
+            if self._serial_object is None:
+                serial_logger.Logger.e("SerialIO", "串口对象为空")
+                return
             self._serial_object.open()
             self._recv_thread = SerialIOCore.SerialRecvThread(
                 self._serial_object,
                 new_console_output = new_console_output,
                 file_output = file_output,
-                normal_output = normal_output
+                normal_output = normal_output,
+                hex_output = hex_output
             )
             self._recv_thread.allocate_resources()
             self._recv_thread.start()
+            self._is_open = True
         
         def close(self):
+            if self._is_open is False:
+                return
             if self._recv_thread:
                 self._recv_thread.release_resources()
                 self._recv_thread = None
             self._serial_object.close()
+            self._is_open = False
         
         def send(self, data: bytes):
             self._serial_object.write(data)
@@ -194,6 +252,12 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                 self._recv_thread._trigger_list[trigger_tag].append(func)
                 return func
             return decorator
+        
+        def set_output_format(self, format):
+            if format == "Hex":
+                self._recv_thread._hex_output = True
+            else:
+                self._recv_thread._hex_output = False
     
     _serial_dict = {}
         
