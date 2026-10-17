@@ -170,32 +170,20 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                     return
 
     class SerialIO: # 单个串口 IO 
-        _serial_properties = {}
+        serial_properties = {}
+
         _serial_object = serial.Serial()
         _recv_thread = None # SerialRecvThread
         _is_open = False
 
-        def __init__(self, serial_args):
+        def __init__(self, serial_properties):
             self.set_default_properties()
-            self.set_properties(serial_args)
-        
-        def set_properties(self, serial_args):
-            for key in serial_args:
-                self._serial_properties[key] = serial_args[key]
-                match key:
-                    case "port": self._serial_object.port = serial_args[key]
-                    case "baudrate": self._serial_object.baudrate = serial_args[key]
-                    case "bytesize": self._serial_object.bytesize = serial_args[key]
-                    case "parity": self._serial_object.parity = serial_args[key]
-                    case "stopbits": self._serial_object.stopbits = serial_args[key]
-                    case "timeout": self._serial_object.timeout = serial_args[key]
-                    case "xonxoff": self._serial_object.xonxoff = serial_args[key]
-                    case "rtscts": self._serial_object.rtscts = serial_args[key]
-                    case "write_timeout": self._serial_object.write_timeout = serial_args[key]
-                    case "dsrdtr": self._serial_object.dsrdtr = serial_args[key]
-        
-        def set_default_properties(self):
-            self.set_properties({
+            self.set_properties(serial_properties)
+
+        @staticmethod
+        def get_default_properties():
+            return {
+                "port": None,
                 "baudrate": 9600,
                 "bytesize": 8,
                 "parity": "N",
@@ -205,9 +193,27 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                 "rtscts": False,
                 "write_timeout": None,
                 "dsrdtr": False
-            })
+            }
         
+        # 传入字典中包含的键值对覆盖原键值对, 原字典中其他键值对不变
+        def set_properties(self, serial_properties):
+            for key in serial_properties:
+                self.serial_properties[key] = serial_properties[key]
+                match key:
+                    case "port": self._serial_object.port = serial_properties[key]
+                    case "baudrate": self._serial_object.baudrate = serial_properties[key]
+                    case "bytesize": self._serial_object.bytesize = serial_properties[key]
+                    case "parity": self._serial_object.parity = serial_properties[key]
+                    case "stopbits": self._serial_object.stopbits = serial_properties[key]
+                    case "timeout": self._serial_object.timeout = serial_properties[key]
+                    case "xonxoff": self._serial_object.xonxoff = serial_properties[key]
+                    case "rtscts": self._serial_object.rtscts = serial_properties[key]
+                    case "write_timeout": self._serial_object.write_timeout = serial_properties[key]
+                    case "dsrdtr": self._serial_object.dsrdtr = serial_properties[key]
         
+        def set_default_properties(self):
+            self.set_properties(self.get_default_properties())
+
         def open(
             self,
             new_console_output = True,
@@ -273,6 +279,8 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
         if self._serial_dict.get(port) is not None:
             self._serial_dict[port].close()
             del self._serial_dict[port]
+    
+    
 
 
 def main():
@@ -321,6 +329,7 @@ def main():
             file_output = True,
             normal_output = False
         )
+
 
 if __name__ == "__main__":
     main()
