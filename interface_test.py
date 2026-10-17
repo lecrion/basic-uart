@@ -31,7 +31,7 @@ class SerialAssistWindow(QWidget):
         self._width = 800
         self._height = 600
         self._serial_io_core = serial_io_core.SerialIOCore()
-        self._serial_io_object = None
+        self._serial_io_object = self._serial_io_core.new_serial_io()
         self._serial_properties = serial_io_core.SerialIOCore.SerialIO.get_default_properties()
         self._show_format = "ASCII"
         self._serial_properties = serial_io_core.SerialIOCore.SerialIO.get_default_properties()
@@ -175,7 +175,7 @@ class SerialAssistWindow(QWidget):
             if self._serial_properties.get("port") is None:
                 Logger.e("interface", "No serial port selected.")
                 return
-            self._serial_io_object = self._serial_io_core.add_serial_io(self._serial_properties)
+            self._serial_io_object.set_properties(self._serial_properties)
             self._serial_io_object.open(
                 new_console_output = True,
                 file_output = True,
