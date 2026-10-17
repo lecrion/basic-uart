@@ -7,7 +7,8 @@ import threading
 import serial.tools.list_ports
 import time
 import datetime
-import serial_logger
+
+from serial_logger import Logger
 
 # pyserial API Reference: https://pyserial.readthedocs.io/en/latest/pyserial_api.html
 
@@ -48,34 +49,27 @@ def list_serial_ports():
 
 class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线程
 
-    def __init__(self):
-        pass
-
     class SerialRecvThread(threading.Thread):
 
-        _serial_object = None # serial.Serial 对象
-        _recv_display_subprocess = None # 接收数据显示子进程
-        _display_pipe = None # 子进程 stdin 管道
-
-        _new_console_output = True # 串口接收的数据输出到新控制台窗口
-        _file_output = True # 串口接收的数据输出到文件
-        _normal_output = False # 串口接收的数据输出到主进程控制台
-
-        _hex_output = False # hex 输出
-
-        _log_file = None # 日志文件
-
-        def set_properties(
-            self,
-            new_console_output = True,
-            file_output = True,
+        def __init__(
+            self, 
+            serial_object, 
+            new_console_output = True, 
+            file_output = True, 
             normal_output = False,
             hex_output = False
         ):
+            super().__init__()
+
+            self._serial_object = serial_object
             self._new_console_output = new_console_output
             self._file_output = file_output
             self._normal_output = normal_output
             self._hex_output = hex_output
+
+            self._recv_display_subprocess = None
+            self._display_pipe = None
+            self._log_file = None
 
         def allocate_resources(self):
             self._recv_display_subprocess = subprocess.Popen(
@@ -100,23 +94,6 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                 self._display_pipe.close()
             if self._recv_display_subprocess:
                 self._recv_display_subprocess.terminate()
-
-        def __init__(
-            self, 
-            serial_object: serial.Serial, 
-            new_console_output = True, 
-            file_output = True, 
-            normal_output = False,
-            hex_output = False
-        ):
-            super().__init__()
-            self._serial_object = serial_object
-            self.set_properties(
-                new_console_output = new_console_output,
-                file_output = file_output,
-                normal_output = normal_output,
-                hex_output = hex_output
-            )
 
         _trigger_list = {
             "test_1": [], 
@@ -160,17 +137,17 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                                 sys.stdout.buffer.write(data)
                                 sys.stdout.buffer.flush()
                         else:
-                            serial_logger.Logger.d("SerialRecvThread", "No data received")
+                            Logger.d("SerialRecvThread", "No data received")
                     else:
-                        serial_logger.Logger.d("SerialRecvThread", "串口已关闭")
+                        Logger.d("SerialRecvThread", "串口已关闭")
                         return
                 except Exception as e:
-                    serial_logger.Logger.e("SerialRecvThread", e)
+                    Logger.e("SerialRecvThread", e)
                     self.release_resources()
                     return
 
     class SerialIO: # 单个串口 IO 
-        serial_properties = {}
+        _serial_properties = {}
 
         _serial_object = serial.Serial()
         _recv_thread = None # SerialRecvThread
@@ -195,10 +172,14 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                 "dsrdtr": False
             }
         
+        def get_properties(self):
+            return self._serial_properties.copy()
+        
         # 传入字典中包含的键值对覆盖原键值对, 原字典中其他键值对不变
+        # 只能通过 set_properties 来修改串口参数, 因为这个方法同时维护 self._serial_properties 字典和 self._serial_object 的属性
         def set_properties(self, serial_properties):
             for key in serial_properties:
-                self.serial_properties[key] = serial_properties[key]
+                self._serial_properties[key] = serial_properties[key]
                 match key:
                     case "port": self._serial_object.port = serial_properties[key]
                     case "baudrate": self._serial_object.baudrate = serial_properties[key]
@@ -260,27 +241,16 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             return decorator
         
         def set_output_format(self, format):
-            if format == "Hex":
-                self._recv_thread._hex_output = True
-            else:
-                self._recv_thread._hex_output = False
-    
-    _serial_dict = {}
+            if self._recv_thread is None:
+                Logger.e("SerialIO.set_output_format", "接收线程为空")
+                return
+            self._recv_thread._hex_output = True if format == "Hex" else False
+
+    # 为了保持优雅, 我们允许在不传入端口号的情况下新建 SerialIO 实例, 但此时 SerialIOCore 无法根据端口号管理所有 SerialIO 实例
+    # 所以我们采用 new-delete 的逻辑, SerialIOCore 只负责分发实例, 此后实例只由申请者持有和释放.
         
-    def add_serial_io(self, serial_args):
-        if self._serial_dict.get(serial_args["port"]) is None:
-            self._serial_dict[serial_args["port"]] = self.SerialIO(serial_args)
-        return self._serial_dict[serial_args["port"]]
-    
-    def get_serial_io(self, port):
-        return self._serial_dict.get(port)
-    
-    def remove_serial_io(self, port):
-        if self._serial_dict.get(port) is not None:
-            self._serial_dict[port].close()
-            del self._serial_dict[port]
-    
-    
+    def new_serial_io(self, serial_args = {}):
+        return self.SerialIO(serial_args)
 
 
 def main():
