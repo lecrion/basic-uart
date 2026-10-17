@@ -14,20 +14,28 @@ from PyQt5.QtWidgets import (
 
 from PyQt5.QtGui import QCursor
 
+from serial_logger import Logger
+
 
 class SerialAssistWindow(QWidget):
-    _serial_io_core = None
+
+    def set_properties(self, properties_dict):
+        for key in properties_dict:
+            self._serial_properties[key] = properties_dict[key]
+
+    def set_default_properties(self):
+        self.set_properties(serial_io_core.SerialIOCore.SerialIO.get_default_properties())
 
     def __init__(self):
         super().__init__()
         self._width = 800
         self._height = 600
-        self._port_name = None
-        self._baudrate_value = 115200
-        self._bytesize_value = 8
-        self._parity_value = "N"
-        self._stopbits_value = 1
         self._serial_io_core = serial_io_core.SerialIOCore()
+        self._serial_io_object = None
+        self._serial_properties = serial_io_core.SerialIOCore.SerialIO.get_default_properties()
+        self._show_format = "ASCII"
+        self._serial_properties = serial_io_core.SerialIOCore.SerialIO.get_default_properties()
+        
         self.init_ui()
     
     def init_ui(self):
@@ -50,7 +58,7 @@ class SerialAssistWindow(QWidget):
 
         self._baudrate_edit = QLineEdit(self)
         self._baudrate_edit.setGeometry(90, 40, 80, 30)
-        self._baudrate_edit.setText(str(self._baudrate_value))
+        self._baudrate_edit.setText(str(self._serial_properties["baudrate"]))
         self._baudrate_edit.editingFinished.connect(self._on_baudrate_changed)
 
         self._bytesize_label = QLabel("Bytesize:", self)
@@ -78,7 +86,7 @@ class SerialAssistWindow(QWidget):
         self._stopbits_box.addItems(["1", "1.5", "2"])
         self._stopbits_box.setGeometry(90, 160, 80, 30)
         self._stopbits_box.currentTextChanged.connect(self._on_stopbits_changed)
-        self._stopbits_box.setCurrentText(str(self._stopbits_value))
+        self._stopbits_box.setCurrentText(str(self._serial_properties["stopbits"]))
 
         self._open_serial_btn = QPushButton("Open Serial", self)
         self._open_serial_btn.setGeometry(0, 200, 170, 30)
@@ -91,6 +99,15 @@ class SerialAssistWindow(QWidget):
         self._default_send_btn = QPushButton("Send Default", self)
         self._default_send_btn.setGeometry(0, 280, 170, 30)
         self._default_send_btn.clicked.connect(self._on_default_send)
+
+        self._show_format_label = QLabel("Format:", self)
+        self._show_format_label.setGeometry(0, 320, 80, 30)
+
+        self._show_format_box = QComboBox(self)
+        self._show_format_box.addItems(["ASCII", "Hex"])
+        self._show_format_box.setGeometry(90, 320, 80, 30)
+        self._show_format_box.currentTextChanged.connect(self._on_show_format_changed)
+        self._show_format_box.setCurrentText(self._show_format)
 
         self._send_msg_label = QLabel("Send UART message:", self)
         self._send_msg_label.setGeometry(0, 420, 170, 30)
@@ -111,8 +128,7 @@ class SerialAssistWindow(QWidget):
         event.accept()
 
     def _on_port_selected(self, port):  # 选择串口
-        self._port_name = port
-        
+        self._serial_properties["port"] = port
     
     def _on_port_highlight(self, port): # 高亮串口时显示提示信息
         QToolTip.showText(QCursor.pos(), serial_io_core.list_serial_ports()[port], self._port_select_box)
@@ -124,16 +140,16 @@ class SerialAssistWindow(QWidget):
     def _on_baudrate_changed(self):  # 波特率改变
         baudrate = self._baudrate_edit.text()
         if baudrate.isdigit():
-            self._baudrate_value = int(baudrate)
+            self._serial_properties["baudrate"] = int(baudrate)
         else:
-            self._baudrate_value = 115200
+            self._serial_properties["baudrate"] = 115200
             self._baudrate_edit.setText("115200")
     
     def _on_bytesize_changed(self, bytesize):  # 数据位改变
-        self._bytesize_value = int(bytesize)
+        self._serial_properties["bytesize"] = int(bytesize)
 
     def _on_parity_changed(self, parity):  # 校验位改变
-        self._parity_value = {
+        self._serial_properties["parity"] = {
             "None": "N",
             "Even": "E",
             "Odd": "O",
@@ -152,23 +168,23 @@ class SerialAssistWindow(QWidget):
         QToolTip.showText(QCursor.pos(), help_message, self._parity_box)
 
     def _on_stopbits_changed(self, stopbits):  # 停止位改变
-        self._stopbits_value = float(stopbits)
-    
+        self._serial_properties["stopbits"] = float(stopbits)
+
     def _on_open_serial(self):
         try:
-            self._serial_io_object = self._serial_io_core.add_serial_io(
-                {
-                    "port": self._port_name,
-                    "baudrate": self._baudrate_value,
-                    "bytesize": self._bytesize_value,
-                    "parity": self._parity_value,
-                    "stopbits": self._stopbits_value
-                }
+            if self._serial_properties.get("port") is None:
+                Logger.e("interface", "No serial port selected.")
+                return
+            self._serial_io_object = self._serial_io_core.add_serial_io(self._serial_properties)
+            self._serial_io_object.open(
+                new_console_output = True,
+                file_output = True,
+                normal_output = True,
+                hex_output = True if self._show_format == "Hex" else False
             )
-            self._serial_io_object.open()
             self._serial_io_object.register_recv_trigger("test_1")(self._on_recv_msg)
         except Exception as e:
-            print(f"Exception in _on_open_serial: {e}")
+            Logger.e("interface", f"exception in _on_open_serial: {e}")
 
     def _on_close_serial(self):
         try:
@@ -176,14 +192,14 @@ class SerialAssistWindow(QWidget):
                 self._serial_io_core.remove_serial_io(self._serial_io_object.get_port_name())
                 self._serial_io_object = None
         except Exception as e:
-            print(f"Exception in _on_close_serial: {e}")
+            Logger.e("interface", f"exception in _on_close_serial: {e}")
 
     def _on_default_send(self):
         try:
             self._serial_io_object.send(b"Hello, Serial Port!")
         except Exception as e:
-            print(f"Exception in _on_default_send: {e}")
-    
+            Logger.e("interface", f"exception in _on_default_send: {e}")
+
     def _on_send_msg(self):
         try:
             msg = self._send_msg_edit.toPlainText()
@@ -193,6 +209,10 @@ class SerialAssistWindow(QWidget):
     
     def _on_recv_msg(self, data):
         self._recv_msg_edit.appendPlainText(data.decode("utf-8", errors="ignore"))
+    
+    def _on_show_format_changed(self, format):
+        self._output_format = format
+        self._serial_io_object.set_output_format(format)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
