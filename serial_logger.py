@@ -1,20 +1,26 @@
 import datetime
 import time
+import rich.console
+
+serial_logger_console = rich.console.Console()
 
 class Logger:
-    def d(self, tag, msg):
-        print(f"[{datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]}] [DEBUG] [{tag}] {msg}")
+    @staticmethod
+    def d(tag, msg):
+        serial_logger_console.print(f"[{datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]}] [bold blue][DEBUG][/bold blue] [{tag}] {msg}")
     
-    def i(self, tag, msg):
-        print(f"[{datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]}] [INFO] [{tag}] {msg}")
+    @staticmethod
+    def i(tag, msg):
+        serial_logger_console.print(f"[{datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]}] [bold green][INFO][/bold green] [{tag}] {msg}")
 
-    def w(self, tag, msg):
-        print(f"[{datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]}] [WARNING] [{tag}] {msg}")
+    @staticmethod
+    def w(tag, msg):
+        serial_logger_console.print(f"[{datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]}] [bold yellow][WARNING][/bold yellow] [{tag}] {msg}")
     
-    def e(self, tag, msg):
-        print(f"[{datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]}] [ERROR] [{tag}] {msg}")
+    @staticmethod
+    def e(tag, msg):
+        serial_logger_console.print(f"[{datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]}] [bold red][ERROR][/bold red] [{tag}] {msg}")
 
-Logger = Logger()
 
 if __name__ == "__main__":
     Logger.d("114", "514")
