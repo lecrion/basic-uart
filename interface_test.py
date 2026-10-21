@@ -12,12 +12,16 @@ from PyQt5.QtWidgets import (
     QToolTip
 )
 
+from PyQt5.QtCore import pyqtSignal
+
 from PyQt5.QtGui import QCursor
 
 from serial_logger import Logger
 
 
 class SerialAssistWindow(QWidget):
+
+    on_recv_msg_signal = pyqtSignal(bytes)
 
     def set_properties(self, properties_dict):
         for key in properties_dict:
@@ -35,6 +39,8 @@ class SerialAssistWindow(QWidget):
         self._serial_properties = serial_io_core.SerialIOCore.SerialIO.get_default_properties()
         self._show_format = "ASCII"
         self._serial_properties = serial_io_core.SerialIOCore.SerialIO.get_default_properties()
+
+        self.on_recv_msg_signal.connect(self._on_recv_msg)
         
         self.init_ui()
     
@@ -44,7 +50,7 @@ class SerialAssistWindow(QWidget):
 
         self._port_select_box = QComboBox(self)
         self._port_select_box.addItems(list(serial_io_core.list_serial_ports().keys()))
-        self._port_name = self._port_select_box.currentText()
+        self._serial_properties["port"] = self._port_select_box.currentText()
         self._port_select_box.setGeometry(0, 0, 80, 30)
         self._port_select_box.currentTextChanged.connect(self._on_port_selected)
         self._port_select_box.highlighted[str].connect(self._on_port_highlight)
@@ -172,6 +178,11 @@ class SerialAssistWindow(QWidget):
 
     def _on_open_serial(self):
         try:
+            if self._serial_io_object is None:
+                self._serial_io_object = self._serial_io_core.new_serial_io()
+            if self._serial_io_object.is_open():
+                Logger.i("interface", "串口已经打开")
+                return
             if self._serial_properties.get("port") is None:
                 Logger.e("interface", "No serial port selected.")
                 return
@@ -179,24 +190,26 @@ class SerialAssistWindow(QWidget):
             self._serial_io_object.open(
                 new_console_output = True,
                 file_output = True,
-                normal_output = True,
+                normal_output = False,
                 hex_output = True if self._show_format == "Hex" else False
             )
-            self._serial_io_object.register_recv_trigger("test_1")(self._on_recv_msg)
+            @self._serial_io_object.register_recv_trigger("once_data_recv")
+            def signal_emit(data):
+                self.on_recv_msg_signal.emit(data)
         except Exception as e:
             Logger.e("interface", f"exception in _on_open_serial: {e}")
 
     def _on_close_serial(self):
         try:
             if self._serial_io_object:
-                self._serial_io_core.remove_serial_io(self._serial_io_object.get_port_name())
+                self._serial_io_object.close()
                 self._serial_io_object = None
         except Exception as e:
             Logger.e("interface", f"exception in _on_close_serial: {e}")
 
     def _on_default_send(self):
         try:
-            self._serial_io_object.send(b"Hello, Serial Port!")
+            self._serial_io_object.send(b"Default message.")
         except Exception as e:
             Logger.e("interface", f"exception in _on_default_send: {e}")
 
@@ -211,7 +224,7 @@ class SerialAssistWindow(QWidget):
         self._recv_msg_edit.appendPlainText(data.decode("utf-8", errors="ignore"))
     
     def _on_show_format_changed(self, format):
-        self._output_format = format
+        self._show_format = format
         self._serial_io_object.set_output_format(format)
 
 if __name__ == "__main__":
