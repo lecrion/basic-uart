@@ -193,7 +193,7 @@ class SerialAssistWindow(QWidget):
                 normal_output = False,
                 hex_output = True if self._show_format == "Hex" else False
             )
-            @self._serial_io_object.register_recv_trigger("once_data_recv")
+            @self._serial_io_object.register_recv_trigger("get_show_data")
             def signal_emit(data):
                 self.on_recv_msg_signal.emit(data)
         except Exception as e:
