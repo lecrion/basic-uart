@@ -12,9 +12,11 @@ from serial_logger import Logger
 
 # pyserial API Reference: https://pyserial.readthedocs.io/en/latest/pyserial_api.html
 
-def add_timestamp(data):
-    timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S.%f]") + f" Recv {len(data)} bytes\n"
-    return timestamp.encode("utf-8") + data + b"\n"
+def get_current_time():
+    return datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S.%f]")
+
+def add_timestamp(data, data_length = -1, time = "default_time"):
+    return time.encode("utf-8") + f" Recv {data_length} bytes\n".encode("utf-8") + data + b"\n"
 
 def to_hex(data):
     return data.hex(" ").upper().encode("utf-8")
@@ -122,9 +124,10 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                         if data:
                             data += self._serial_object.read_all()
 
+                            data_length = len(data)
                             if self._hex_output:
                                 data = to_hex(data)
-                            data = add_timestamp(data)
+                            data = add_timestamp(data, data_length, get_current_time())
                             
                             self._trigger_once_data_recv(data)
                             if self._new_console_output:
@@ -137,7 +140,9 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                                 sys.stdout.buffer.write(data)
                                 sys.stdout.buffer.flush()
                         else:
-                            Logger.d("SerialRecvThread", "No data received")
+                            Logger.i("SerialRecvThread", "退出接收线程")
+                            self.release_resources()
+                            return
                     else:
                         Logger.d("SerialRecvThread", "串口已关闭")
                         return
@@ -195,6 +200,9 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
         def set_default_properties(self):
             self.set_properties(self.get_default_properties())
 
+        def is_open(self):
+            return self._is_open
+
         def open(
             self,
             new_console_output = True,
@@ -202,7 +210,7 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             normal_output = False,
             hex_output = False
         ):
-            if self._is_open:
+            if self.is_open():
                 return
             if self._serial_object is None:
                 serial_logger.Logger.e("SerialIO", "串口对象为空")
@@ -236,7 +244,10 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
         # 注册的函数参数列表必须为 func(data: bytes), data 为接收到的字节串
         def register_recv_trigger(self, trigger_tag):
             def decorator(func):
-                self._recv_thread._trigger_list[trigger_tag].append(func)
+                if func not in self._recv_thread._trigger_list[trigger_tag]:
+                    self._recv_thread._trigger_list[trigger_tag].append(func)
+                else:
+                    Logger.i("register_recv_trigger", "已经注册函数")
                 return func
             return decorator
         
