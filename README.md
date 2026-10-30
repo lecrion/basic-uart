@@ -1,28 +1,38 @@
 ## basic-uart
 
-实现基本的 UART 串口收发与简单附加功能.
+本科生科创项目任务.
 
-本科生科创项目子任务.
+### 项目概览
 
-![task_detail_1](https://raw.githubusercontent.com/lecrion/basic-uart/main/Images/task_detail_1.jpg)
+#### 第一期:
 
-![task_detail_2](https://raw.githubusercontent.com/lecrion/basic-uart/main/Images/task_detail_2.jpg)
+- 实现基本的 UART 串口收发与简单附加功能, 包括串口参数(波特率, 校验位等)的修改, 展示格式设为 ASCII 展示或十六进制展示等. 利用串口收发内核构建可运行的 GUI 软件.
+
+#### 第二期:
+
+- 在上一期串口收发内核的基础上, 根据实际 NAV100 数据帧, 编写帧解析功能, 从串口数据流提取数据帧并且显示在 GUI 中. 另外对串口内核代码进行调试, 增强内核运行时稳定性
+
+#### 第三期:
+
+- 制作 3D 无人机模型, 根据接收数据帧中的姿态信息参数, 在屏幕上实时渲染无人机的姿态.
+
+- 在应用软件中添加地图模块, 根据接收数据真的经纬度, 海拔等信息, 在屏幕上绘制地图并将无人机的位置显示在地图中, 并显示无人机飞行轨迹.
+
+- 上位机发送指令数据帧给雷达, 使其更改自身参数和工作状态. 这一块有关于 "指令数据帧" 和 "反馈数据帧" 的相关功能开发, 感觉可以用一些序列化算法, 动态载入指令帧协议和反馈帧协议, 实现可移植到不同雷达下位机的应用程序.
 
 ### 参考工具
 
 1. UARTAssist 串口调试助手, 绿色软件, 来源 [野人家园](www.cmsoft.cn/software.html), 包含收发日志显示( 可选 ASCII/HEX ), 串口波特率, 数据位, 停止位, 校验位, 流控制等参数的配置, 接收保存到文件, 自动循环发送信号等功能. 属于较为底层的软件
 
-![uart_assist_show](https://raw.githubusercontent.com/lecrion/basic-uart/main/Images/uart_assist_show.jpg)
-
 1. Vofa+ 高自由度上位机, 这个软件支持的通信协议不仅限于串口, 还能够通过 UDP/TCP 接收数据. 它有一个很值得借鉴的功能就是插件驱动, 通过插件可以实现在屏幕上绘制曲线, 图表等一系列可视化组件. 同时也支持 raw 数据的显示, 以及串口全部参数的配置.
-
-![vofa_show](https://raw.githubusercontent.com/lecrion/basic-uart/main/Images/vofa_show.jpg)
 
 ### 技术设想
 
 1. 整体使用 Python 按模块开发, 包括: 
     - 利用 pyserial 模块, 将底层 (操作系统层) 串口数据收发功能封装为核心库, 暴露有关 API 供后续使用
     - 使用 PyQt 搭建 GUI 界面, 同时基于与核心交互的数据, 使用 PyQtGraph 绘制曲线或图像
+    - 渲染无人机模型, 姿态展示, 使用 PyOpenGL 路线, 高效完成开发验证. 或者使用 C++ 编译 Direct3D 库(高性能实现)
+    - 地图模块与路径展示: OpenStreetMap API(免费路线), 百度/高德/谷歌 API(付费路线)
 
 1. 核心库可能的细节:
     - 可以同时打开很多串口, 并且分别触发不同的代码行为
@@ -45,101 +55,26 @@
 
 1. Xon/Xoff 软件流控
 
-### 项目介绍
+### 项目指南
 
-1. `提交包.zip`
+需要环境 Python 3 及以上,
 
-    是 `Proletariat571` 提交的一个非常精美的 demo, 虽然是 Vibe Coding 但很有参考价值. 不过里面的代码好复杂, 我目前看不懂.
+需要 Python 包:
 
-1. `serial_test.py`
+```
+pyserial
+PyQt5
+pyqtgraph
+rich
+```
 
-    最开始 vibe coding 实现的 demo 小项目, 实现最基本的查看串口属性, 根据命令行传参决定串口参数( 波特率, 校验位等 ), 打开关闭串口等功能.
+安装第三方库:
 
-1. `serial_io_core.py`
+```bash
+pip install pyserial PyQt5 pyqtgraph rich
+```
 
-    99% 手写实现的一个串口读写内核. 
+运行 demo 程序:
 
-    为什么要在 `pyserial` 模块已经封装很完善的情况下再额外封装一个内核呢? 
-
-    我的想法是这样的, 项目书中要求实现实时显示带时间戳的接收数据, 这就要求一个非阻塞的接收模块( 不能阻塞直到接收到指定长度的字节串, 因为这样就不能实时显示数据了 ). 而如果采用在主线程中直接使用非阻塞的 `serial.Serial.read_all()` 方法高频轮询读取的话, 又会造成大量的 CPU 开销, 且不容许主线程调用其他的阻塞函数. 日后如果添加数据分析模块和图形渲染模块的话, 也不太能接受这种性能的浪费.
-
-    所以我将读取串口数据的部分专门解耦出来, 封装到一个独立的线程 `SerialIOCore.SerialRecvThread` 中. 
-
-    串口接收线程的逻辑是: 在读到数据前持续阻塞, 读到 1 字节数据后才将缓冲区内的所有数据都读出来, 并写到日志文件 / 主进程 stdout / 子进程 stdout 中, 再进入下一个循环. 这样的优点是保证了实时性, 同时不会造成大量 CPU 开销, 我们也能在主线程中异步进行阻塞性操作, 非常的优雅.
-
-    另外, 我还想到了一种很优雅的设计, 并且实现到了代码中. 这就是通过 Python 特有的装饰器( `@decorator` ) 语法实现的事件驱动型编程. 
-
-    通过装饰器, 在定义函数时将函数名注册到接收线程维护的注册列表中, 接收线程每进行一次事件循环, 都会在特定的时机触发相应的外部函数. 具体用法可以见下面的 "代码文档" 章节.
-
-1. `serial_recv_display.py` `serial_recv_display_utf8.py`
-
-    接收线程如果将串口收发数据都打印在主进程的控制台, 将会非常杂乱. 所以我在接收线程中新建了一个子进程, 将串口收发数据通过管道传递到子进程, 并打印在子进程的新窗口. 这样的话, 主进程控制台的命令信息或调试信息就和子进程的串口收发信息分开来了. 
-
-    `serial_recv_display.py` `serial_recv_display_utf8.py` 这两个文件就是子进程实际执行的内容: 功能都是将 stdin 读取到的字节流原封不动地打印到自己所属的控制台窗口上. 
-    
-    开发时发现, 第一份代码无法正确将包含中文等特殊字符的 UTF-8 字节串打印出来, 所以我 vibe coding 出了第二份代码, 也就是能够将管道中单字节传输的字节串重组为正确 UTF-8 编码再打印到屏幕上的版本. 简单来说就是第一版不能显示串口收发的中文字符, 而第二版可以.
-
-1. `core_test.py`
-
-    用于检验将 `serial_io_core.py` 作为模块导入后能否正常工作.
-
-1. `interface_test.py`
-
-    学习用的 demo, 测试 PyQt 模块的功能.
-
-### API Docs
-
-**`serial_io_core.py`**
-
-1. `serial_io_core.list_serial_ports()`
-
-    - 参数: 无
-    - 返回值: 无
-    - 简介: 调用该函数, 在命令行打印所有可用的串口号及其信息.
-
-1. `serial_io_core.SerialIOCore`
-
-    - 简介: 串口读写总内核, 可以实现多个串口同时输入输出.
-    - 属性: 无
-    - 方法:
-
-        1. `add_serial_io(self, serial_args: dict)`
-
-            - 参数: `serial_args: dict` 打开串口时使用的参数字典, 格式形如 `{"port": "COM3", "baudrate": 115200}`
-            - 返回值: 打开的串口 `serial_io_core.SerialIOCore.SerialIO` 实例
-            - 简介: 向内核添加一个串口 I/O 实例
-
-        1. `get_serial_io(self, port: str)`
-
-            - 参数: `port: str` 串口端口号, 形如 `"COM3"`
-            - 返回值: 端口号对应的串口 `serial_io_core.SerialIOCore.SerialIO` 实例. 若端口对应实例不存在, 返回 `None`.
-            - 简介: 在内核中查找端口号对应的串口 I/O 实例
-
-        1. `remove_serial_io(self, port: str)`
-
-            - 参数: `port: str` 串口端口号, 形如 `"COM3"`
-            - 返回值: 无
-            - 简介: 从内核中删除端口号对应的串口 I//O 实例.
-    - 子类:
-
-        1. `serial_io_core.SerialIOCore.SerialRecvThread`
-
-        1. `serial_io_core.SerialIOCore.SerialIO`
-    
-1. `serial_io_core.SerialIOCore.SerialRecvThread`
-
-    - 简介: 其实应该当作私有类不暴露 API 的
-
-1. `serial_io_core.SerialIOCore.SerialIO`
-
-    - 简介: 串口抽象, 暴露打开串口, 关闭串口, 写字节串到串口, 注册事件触发函数等 API
-
-    - 方法: 
-
-        1. `__init__(self, serial_args)`
-
-            - 简介: 从外部不应该直接调用 `__init__` 来添加新串口, 而是通过外部类的 `SerialIOCore.add_serial_io(port)` 方法来添加新串口.
-        
-        1. `open(self, new_console_output = True, file_output = True, normal_output = False)`
-
-            - 简介: 打开串口. 通过三个参数指定串口是否打开新终端输出, 是否输出到日志以及是否在本体控制台输出.
+```bash
+python interface_test.py
