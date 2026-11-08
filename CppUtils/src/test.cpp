@@ -13,7 +13,7 @@ int main()
     }
     JsonObject test;
     file >> test;
-    file.close();
     cout << test.to_string() << endl << endl;
+    file.close();
     return 0;
 }

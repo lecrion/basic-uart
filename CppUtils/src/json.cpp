@@ -1,6 +1,5 @@
 #include "json.hpp"
 #include <algorithm>
-#include <stack>
 
 void JsonObject::reset()
 {
