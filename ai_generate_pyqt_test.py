@@ -1,40 +1,89 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QStackedWidget, QPushButton, QVBoxLayout, QLabel
+import time
+from PyQt5.QtWidgets import (
+    QApplication,
+    QVBoxLayout,
+    QHBoxLayout,
+    QWidget,
+    QLabel,
+    QPushButton,
+    QPlainTextEdit,
+    QComboBox,
+    QLineEdit
+)
 
-class Page1(QWidget):
+class TestWindow_1(QWidget):
     def __init__(self):
         super().__init__()
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("这是页面 1"))
+        self.label = QLabel(self)
+        self.label.setText("test")
+        self.label.setGeometry(0, 0, 300, 100)
+        self.button = QPushButton(self)
+        self.button.setText("test")
+        self.button.setGeometry(0, 100, 300, 100)
 
-class Page2(QWidget):
+class TestWindow_2(QWidget):
     def __init__(self):
         super().__init__()
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("这是页面 2"))
+        for i in range(5):
+            label = QLabel(self)
+            label.setText(f"test {i}")
+            label.setGeometry(0, i * 100, 300, 100)
 
-class MainWindow(QWidget):
+class TestWindow_3(QWidget):
     def __init__(self):
         super().__init__()
-        self.stack = QStackedWidget()
-        self.page1 = Page1()
-        self.page2 = Page2()
-        self.stack.addWidget(self.page1)  # index 0
-        self.stack.addWidget(self.page2)  # index 1
-        self.page_state = 0
+        self.layout = QVBoxLayout(self)
+        for i in range(5):
+            line_edit = QLineEdit(self)
+            line_edit.setText(f"test {i}")
+            self.layout.addWidget(line_edit)
 
-        btn_switch = QPushButton("切换页面")
-        btn_switch.clicked.connect(self.switch_page)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.stack)
-        layout.addWidget(btn_switch)
+class TestWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setGeometry(100, 100, 1000, 800)
+        self.buttons = []
+        for i in range(3):
+            self.buttons.append(QPushButton(f"Button {i}"))
+            self.buttons[i].setParent(self)
+            self.buttons[i].setGeometry(0, i * 50, 100, 50)
+        self.buttons[0].clicked.connect(self.show_1)
+        self.buttons[1].clicked.connect(self.show_2)
+        self.buttons[2].clicked.connect(self.show_3)
+        self.test_1 = TestWindow_1()
+        self.test_1.setParent(self)
+        self.test_1.setGeometry(0, 150, 600, 600)
+        self.test_2 = TestWindow_2()
+        self.test_2.setParent(self)
+        self.test_2.setGeometry(0, 150, 600, 600)
+        self.test_2.hide()
+        self.test_3 = TestWindow_3()
+        self.test_3.setParent(self)
+        self.test_3.setGeometry(0, 150, 600, 600)
+        self.test_3.hide()
+    def show_1(self):
+        self.test_1.show()
+        self.test_2.hide()
+        self.test_3.hide()
+    def show_2(self):
+        self.test_1.hide()
+        self.test_2.show()
+        self.test_3.hide()
+    def show_3(self):
+        self.test_1.hide()
+        self.test_2.hide()
+        self.test_3.show()
     
-    def switch_page(self):
-        self.stack.setCurrentIndex(1 - self.page_state)  # 切换页面
-        self.page_state = 1 - self.page_state  # 更新页面状态
+        
+        
 
-app = QApplication(sys.argv)
-window = MainWindow()
-window.show()
-sys.exit(app.exec_())
+    def func_1(self):
+        self.test_layout.removeWidget()
+    
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = TestWindow()
+    window.show()
+    sys.exit(app.exec_())
