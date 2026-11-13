@@ -101,7 +101,7 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             "test_1": [], 
             "test_2": [],
             "get_raw_data": [],
-            "get_show_data": []
+            "get_stamped_data": []
         } # 事件触发列表
 
 
@@ -117,8 +117,8 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             for func in self._trigger_list["get_raw_data"]:
                 func(data)
         
-        def _trigger_get_show_data(self, data):
-            for func in self._trigger_list["get_show_data"]:
+        def _trigger_get_stamped_data(self, data):
+            for func in self._trigger_list["get_stamped_data"]:
                 func(data)
 
         def run(self):
@@ -129,22 +129,22 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                         if raw_data:
                             raw_data += self._serial_object.read_all()
                             data_length = len(raw_data)
-                            show_data = raw_data
+                            stamped_data = raw_data
                             if self._hex_output:
-                                show_data = to_hex(show_data)
-                            show_data = add_timestamp(show_data, data_length, get_current_time())
+                                stamped_data = to_hex(stamped_data)
+                            stamped_data = add_timestamp(stamped_data, data_length, get_current_time())
                             
                             self._trigger_get_raw_data(raw_data)
-                            self._trigger_get_show_data(show_data)
+                            self._trigger_get_stamped_data(stamped_data)
 
                             if self._new_console_output:
-                                self._display_pipe.write(show_data)
+                                self._display_pipe.write(stamped_data)
                                 self._display_pipe.flush()
                             if self._file_output:
-                                self._log_file.write(show_data)
+                                self._log_file.write(stamped_data)
                                 self._log_file.flush()
                             if self._normal_output:
-                                sys.stdout.buffer.write(show_data)
+                                sys.stdout.buffer.write(stamped_data)
                                 sys.stdout.buffer.flush()
                         else:
                             Logger.i("SerialRecvThread", "退出接收线程")
