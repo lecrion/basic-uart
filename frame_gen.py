@@ -3,6 +3,8 @@ from serial_logger import Logger
 import struct
 import threading
 import time
+import sys
+import argparse
 
 class TestIMUFrame:
     FRAME_LENGTH = 119
@@ -19,7 +21,7 @@ class TestIMUFrame:
         "GPS_vd", "gps_ms", "gps_day", "gps_week",
     )
 
-    def __init__(self):
+    def __init__(self, port="COM14"):
         self.frame_data = {
             "frame_header": "EB 90",
             "frame_length": self.FRAME_LENGTH,
@@ -71,7 +73,7 @@ class TestIMUFrame:
         self.serial_io_core = SerialIOCore()
         self.serial_io_object = self.serial_io_core.new_serial_io()
         self.serial_io_object.set_properties({
-            "port": "COM4",
+            "port": port,
             "baudrate": 115200
         })
         self.serial_io_object.open()
@@ -203,7 +205,16 @@ class CommandThread(threading.Thread):
                     Logger.e("CommandThread", str(error))
 
 if __name__ == "__main__":
-    test_frame = TestIMUFrame()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "port",
+        nargs="?",
+        default="COM14",
+        help="串口名称, 默认: COM14",
+    )
+    args = parser.parse_args()
+
+    test_frame = TestIMUFrame(args.port)
     command_thread = CommandThread(test_frame)
     command_thread.start()
     while True:
