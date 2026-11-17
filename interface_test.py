@@ -11,7 +11,8 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QLineEdit,
     QToolTip,
-    QScrollArea
+    QScrollArea,
+    QOpenGLWidget
 )
 import json
 
@@ -43,28 +44,33 @@ class ParsedRecvMsgShow(QScrollArea):
         self.layout = QVBoxLayout(self.parsed_msg)
         self.setWidget(self.parsed_msg)
         self.setWidgetResizable(True)
+        self.fields_cnt = len(self.protocol_list)
+        self.sub_widgets = []
+        self.sub_layouts = []
         self.labels = []
         self.line_edits = []
-        for i in range(43):
-            tmp_widget = QWidget()
-            tmp_layout = QHBoxLayout(tmp_widget)
+        for i in range(self.fields_cnt):
+            self.sub_widgets.append(QWidget(self.parsed_msg))
+            self.sub_layouts.append(QHBoxLayout(self.sub_widgets[i]))
             self.labels.append(QLabel(self.protocol_list[i]["field"]))
             self.line_edits.append(QLineEdit(self.protocol_list[i]["code_symbol"]))
             self.line_edits[i].setReadOnly(True)
-            tmp_layout.addWidget(self.labels[i])
-            tmp_layout.addWidget(self.line_edits[i])
-            self.layout.addWidget(tmp_widget)
-    def refresh(self, dict_):
-        for i in range(43):
-            self.line_edits[i].setText(str(dict_.get(self.protocol_list[i]["code_symbol"], "N/A")))
+            self.sub_layouts[i].addWidget(self.labels[i])
+            self.sub_layouts[i].addWidget(self.line_edits[i])
+            self.layout.addWidget(self.sub_widgets[i])
+    def refresh(self, frame_dict_):
+        for i in range(self.fields_cnt):
+            self.line_edits[i].setText(str(frame_dict_.get(self.protocol_list[i]["code_symbol"], "N/A")))
 
 
-
+class DroneStatsShow(QOpenGLWidget):
+    def __init__(self, parent = None):
+        super().__init__(parent)
 
 
 class SerialAssistWindow(QWidget):
 
-    on_recv_stamped_data_signal = pyqtSignal(bytes)
+    on_recv_stamped_data_signal = pyqtSignal(str)
     on_recv_raw_data_signal = pyqtSignal(bytes)
 
     def set_properties(self, properties_dict):
@@ -191,11 +197,6 @@ class SerialAssistWindow(QWidget):
         self._main_show_area_ParsedRecvMsgShow.setGeometry(200, 0, 990, 620)
         self._main_show_area_ParsedRecvMsgShow.hide()
 
-        
-        '''self._recv_msg_edit = QPlainTextEdit(self)
-        self._recv_msg_edit.setGeometry(200, 0, 990, 620)
-        self._recv_msg_edit.setReadOnly(True)'''
-
         # main show area
     
     def closeEvent(self, event):
@@ -263,8 +264,8 @@ class SerialAssistWindow(QWidget):
                 hex_output = True if self._show_format == "Hex" else False
             )
             @self._serial_io_object.register_recv_trigger("get_stamped_data")
-            def stamped_signal_emit(data):
-                self.on_recv_stamped_data_signal.emit(data)
+            def stamped_signal_emit(str_data):
+                self.on_recv_stamped_data_signal.emit(str_data)
             @self._serial_io_object.register_recv_trigger("get_raw_data")
             def raw_signal_emit(data):
                 self.on_recv_raw_data_signal.emit(data)
@@ -292,11 +293,9 @@ class SerialAssistWindow(QWidget):
         except Exception as e:
             print(f"Exception in _on_send_msg: {e}")
     
-    def _on_recv_stamped_data(self, data):
-        '''self._recv_msg_edit.appendPlainText(data.decode("utf-8", errors="ignore"))'''
-        
+    def _on_recv_stamped_data(self, str_data):
         if self._main_show_area_RawRecvMsgShow.isVisible():
-            self._main_show_area_RawRecvMsgShow.appendPlainText(data.decode("utf-8", errors="ignore"))
+            self._main_show_area_RawRecvMsgShow.appendPlainText(str_data)
     
     def _on_recv_raw_data(self, data):
         if self._main_show_area_ParsedRecvMsgShow.isVisible():

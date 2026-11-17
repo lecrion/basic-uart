@@ -117,9 +117,9 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
             for func in self._trigger_list["get_raw_data"]:
                 func(data)
         
-        def _trigger_get_stamped_data(self, data):
+        def _trigger_get_stamped_data(self, str_data):
             for func in self._trigger_list["get_stamped_data"]:
-                func(data)
+                func(str_data)
 
         def run(self):
             while True:
@@ -135,7 +135,7 @@ class SerialIOCore: # 设计方向是: 一个内核同时跑多个串口 IO 线�
                             stamped_data = add_timestamp(stamped_data, data_length, get_current_time())
                             
                             self._trigger_get_raw_data(raw_data)
-                            self._trigger_get_stamped_data(stamped_data)
+                            self._trigger_get_stamped_data(stamped_data.decode("utf-8", errors = "ignore"))
 
                             if self._new_console_output:
                                 self._display_pipe.write(stamped_data)
